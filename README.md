@@ -23,5 +23,7 @@ Usage of the tool follows the following format:
 
 ### Flags
 `-p, --proxy`      Use this flag to scan via proxies. If set to true the scan WILL take much longer.
+
 `-o, --output <Output>`        Name of the file to output to (CSV FORMAT).
+
 `-w, --wordlist <WordList>`    Path to a wordlist file which can be used for the scan.
