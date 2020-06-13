@@ -127,8 +127,6 @@ fn processBingData(doc: Document) -> Vec<Vec<String>> {
 
         userVec.push(vec![nameTokens[0].to_string(), nameTokens[1].to_string(), job.to_string()]);
     }
-    // Debug
-    //println!("Returning Data: {:?}", userVec);
     return userVec;
 }
 
