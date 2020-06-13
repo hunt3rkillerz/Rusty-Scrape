@@ -60,6 +60,7 @@ fn main() {
 
 }
 
+// Prints results to file
 fn outputToFile(data: Vec<Vec<String>>, fileName: &str) -> () {
     let mut fileData: String = "First Name,Last Name,Job Title\n".to_owned();
 
@@ -71,6 +72,7 @@ fn outputToFile(data: Vec<Vec<String>>, fileName: &str) -> () {
     fs::write(fileName, fileData).expect("Unable to write file");
 }
 
+// Reads the profession word list out of a file
 fn getWordList(fileLoc: &str) -> Vec<String> {
     let mut dirPath = env::current_dir().unwrap();
     dirPath.push(fileLoc.to_string());
@@ -89,6 +91,7 @@ fn getWordList(fileLoc: &str) -> Vec<String> {
     }
 }
 
+// Utility to help process the Bing Data
 fn processBingData(doc: Document) -> Vec<Vec<String>> {
     let mut userVec = Vec::new();
     for node in doc.find(Name("li")) {
@@ -127,9 +130,11 @@ fn processBingData(doc: Document) -> Vec<Vec<String>> {
 
         userVec.push(vec![nameTokens[0].to_string(), nameTokens[1].to_string(), job.to_string()]);
     }
+
     return userVec;
 }
 
+// Scrapes the data from the Bing Search
 fn scrape(prof: &str, company_name: &str, proxy: Option<Vec<String>>) -> Vec<Vec<String>> {
     let mut isProxy = false;
     let mut proxy_list = match proxy {
@@ -175,8 +180,7 @@ fn scrape(prof: &str, company_name: &str, proxy: Option<Vec<String>>) -> Vec<Vec
                     },
                     Ok(res) => res
         };  
-        //println!("RESP DATA {:?}", res);
-        
+
         let doc = match Document::from_read(res) {
             Err(_e) => continue,
             Ok(doc) => doc
@@ -189,16 +193,17 @@ fn scrape(prof: &str, company_name: &str, proxy: Option<Vec<String>>) -> Vec<Vec
     }
 }
 
+// Splits the vector of profession lists and then performs searches for users in a multi-threaded manner
 fn splitVector(useProxy: bool, company_name: &str, professionList: Vec<String>) -> Vec<Vec<String>> {
     let proxy_list = fetchProxyList();
     let data: Vec<Vec<Vec<String>>>;
     if useProxy {
-        data = professionList[..7].par_iter()
+        data = professionList.par_iter()
             .map(|i| scrape(&i, &company_name.clone(), Some(proxy_list.clone())))
             .collect();
     }
     else {
-        data = professionList[..7].par_iter() 
+        data = professionList.par_iter() 
             .map(|i| scrape(&i, &company_name.clone(), None))
             .collect();
     }
@@ -211,6 +216,8 @@ fn splitVector(useProxy: bool, company_name: &str, professionList: Vec<String>) 
     return cleanArr;
 }
 
+
+// Finds a proxy that works and returns the URL
 fn findProxy(proxy_list: &mut Vec<String>) -> String {
     let mut rng = thread_rng();
     while proxy_list.len() > 0 {
@@ -241,6 +248,8 @@ fn findProxy(proxy_list: &mut Vec<String>) -> String {
     // Only here because this method is disgusting
     return "".to_string();
 }
+
+// Returns a pseudo random user agent from a hardcoded list
 fn getRandomUserAgent() -> String {
     // Hardcoding is the way of the future
     let user_agent_list = [
@@ -270,13 +279,17 @@ fn getRandomUserAgent() -> String {
         "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)",
         "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729)"
     ];
+    // Random Selection
     user_agent_list.choose(&mut rand::thread_rng()).unwrap().to_string()
 }
 
+// Fetches a list of potential Proxy URL's in a vector.
 fn fetchProxyList() -> Vec<String> {
-    // Make Request
+    // This web page contains a table of proxy servers
     const URL: &str = "https://www.sslproxies.org/";
     let client = reqwest::blocking::Client::new();
+
+    // Requesting the page
     let res = client.get(URL)
         .header(USER_AGENT, getRandomUserAgent())
         .send().unwrap();  
