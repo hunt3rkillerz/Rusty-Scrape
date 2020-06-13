@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 extern crate reqwest;
 extern crate select;
 extern crate rand;
@@ -6,6 +7,7 @@ extern crate csv;
 use std::vec::Vec;
 use std::env;
 use std::fs::File;
+use std::fs;
 use std::io::Read;
 use rand::{thread_rng, Rng};
 use rand::seq::SliceRandom;
@@ -17,7 +19,7 @@ use rayon::prelude::*;
 use clap::{Arg, App};
 
 fn main() {
-    let mut matches = App::new("Rusty Scrape")
+    let matches = App::new("Rusty Scrape")
         .version("1.0")
         .author("Hunt3rKillerZ https://github.com/hunt3rkillerz/")
         .about("A tool for pentesters to generate targeted email lists for password sprays and other use cases. DO NOT USE FOR EVIL!")
@@ -37,11 +39,36 @@ fn main() {
             .value_name("WordList")
             .about("Path to a wordlist file which can be used for the scan.")
             .takes_value(true))
+        .arg(Arg::with_name("output")
+            .short('o')
+            .long("output")
+            .value_name("Output")
+            .about("Name of the file to output to (CSV FORMAT).")
+            .takes_value(true))
         .get_matches();
 
     let res = splitVector(matches.is_present("proxy"), matches.value_of("CompanyName").unwrap(), getWordList(matches.value_of("wordlist").unwrap_or("wordlists/default.csv")));
-    println!("\nScan Finished:\n");
-    println!("{:#?}", res);
+    
+    let mut outputFile = "output.csv";
+    if matches.is_present("output") {
+        outputFile = match matches.value_of("output") {
+            Some(val) => val,
+            None => outputFile
+        };
+    }
+    outputToFile(res, outputFile);
+
+}
+
+fn outputToFile(data: Vec<Vec<String>>, fileName: &str) -> () {
+    let mut fileData: String = "First Name,Last Name,Job Title\n".to_owned();
+
+    for user in data {
+        let temp = format!("{},{},{}\n", user[0], user[1], user[2]);
+        fileData.push_str(&temp);
+    }
+
+    fs::write(fileName, fileData).expect("Unable to write file");
 }
 
 fn getWordList(fileLoc: &str) -> Vec<String> {
@@ -65,7 +92,7 @@ fn getWordList(fileLoc: &str) -> Vec<String> {
 fn processBingData(doc: Document) -> Vec<Vec<String>> {
     let mut userVec = Vec::new();
     for node in doc.find(Name("li")) {
-        let mut part1 = match node.find(Name("h2")).next() {
+        let part1 = match node.find(Name("h2")).next() {
             None => continue,
             Some(data) => {
                 data
@@ -79,7 +106,7 @@ fn processBingData(doc: Document) -> Vec<Vec<String>> {
             },
         };
 
-        let mut tokens: Vec<&str> = relData.split("-").collect();
+        let tokens: Vec<&str> = relData.split("-").collect();
         if tokens.len() < 3 {
             // Wrong type of result
             continue
@@ -90,7 +117,7 @@ fn processBingData(doc: Document) -> Vec<Vec<String>> {
         nameData.pop();
 
         // Remove trailing & leading space
-        let mut job = &tokens[1][1..tokens[1].len()-1];
+        let job = &tokens[1][1..tokens[1].len()-1];
 
         let nameTokens: Vec<&str> = nameData.split(" ").collect();
         
@@ -105,7 +132,7 @@ fn processBingData(doc: Document) -> Vec<Vec<String>> {
     return userVec;
 }
 
-fn scrape(prof: &str, company_name: &str, mut proxy: Option<Vec<String>>) -> Vec<Vec<String>> {
+fn scrape(prof: &str, company_name: &str, proxy: Option<Vec<String>>) -> Vec<Vec<String>> {
     let mut isProxy = false;
     let mut proxy_list = match proxy {
         Some(proxy_list) => {
@@ -118,7 +145,7 @@ fn scrape(prof: &str, company_name: &str, mut proxy: Option<Vec<String>>) -> Vec
         let searchURL = format!("http://www.bing.com/search?q=%22{}%22+%22{}%22+site%3Alinkedin.com",
                                         &prof, &company_name);
         // Early Declaration
-        let mut client;
+        let client;
         // Only go through a proxy if the list is provided
         if isProxy {
             if proxy_list.len() == 0 {
@@ -145,15 +172,15 @@ fn scrape(prof: &str, company_name: &str, mut proxy: Option<Vec<String>>) -> Vec
         let res = match client.get(&searchURL)
                 .header(USER_AGENT, getRandomUserAgent())
                 .send(){
-                    Err(e) => {
+                    Err(_e) => {
                         continue
                     },
                     Ok(res) => res
         };  
         //println!("RESP DATA {:?}", res);
         
-        let mut doc = match Document::from_read(res) {
-            Err(e) => continue,
+        let doc = match Document::from_read(res) {
+            Err(_e) => continue,
             Ok(doc) => doc
         };
         if doc.find(Name("li")).count() < 8 && isProxy {
@@ -165,8 +192,8 @@ fn scrape(prof: &str, company_name: &str, mut proxy: Option<Vec<String>>) -> Vec
 }
 
 fn splitVector(useProxy: bool, company_name: &str, professionList: Vec<String>) -> Vec<Vec<String>> {
-    let mut proxy_list = fetchProxyList();
-    let mut data: Vec<Vec<Vec<String>>>;
+    let proxy_list = fetchProxyList();
+    let data: Vec<Vec<Vec<String>>>;
     if useProxy {
         data = professionList[..7].par_iter()
             .map(|i| scrape(&i, &company_name.clone(), Some(proxy_list.clone())))
@@ -183,8 +210,6 @@ fn splitVector(useProxy: bool, company_name: &str, professionList: Vec<String>) 
             cleanArr.push(elem);
         }
     }
-    //println!("\n\n\n");
-    //println!("This is the final Data: {:?}", cleanArr);
     return cleanArr;
 }
 
@@ -195,30 +220,31 @@ fn findProxy(proxy_list: &mut Vec<String>) -> String {
         let randVal = rng.gen_range(0, proxy_list.len()-1);
         let proxy = proxy_list[randVal].clone();
         proxy_list.remove(randVal);
-        const url: &str = "http://www.bing.com/search?q=Test+Search&qs=n&form=QBRE&sp=-1&ghc=1&pq=test+searc&sc=5-10&sk=&cvid=B580BE8B2CDB4AB7817D09B5011F1A6C";
+        const URL: &str = "http://www.bing.com/search?q=Test+Search&qs=n&form=QBRE&sp=-1&ghc=1&pq=test+searc&sc=5-10&sk=&cvid=B580BE8B2CDB4AB7817D09B5011F1A6C";
         let client = reqwest::blocking::Client::builder().proxy(
             reqwest::Proxy::all(&proxy).unwrap()
         ).timeout(
             // 10 Second Timeout means basically everything works
             Duration::new(10, 0)
         ).build().unwrap();
-        let res = match client.get(url)
+        match client.get(URL)
             .header(USER_AGENT, getRandomUserAgent())
             .send()
         {
-            Err(e) => {
+            Err(_e) => {
                 continue
             },
             Ok(res) => res
         };  
 
-        // We found our boi
+        // We found our proxy
         return proxy.to_string();
     }
     // Only here because this method is disgusting
     return "".to_string();
 }
 fn getRandomUserAgent() -> String {
+    // Hardcoding is the way of the future
     let user_agent_list = [
         //Chrome
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36",
@@ -250,17 +276,14 @@ fn getRandomUserAgent() -> String {
 }
 
 fn fetchProxyList() -> Vec<String> {
-    
-    // Randomize user agent
-
     // Make Request
-    const url: &str = "https://www.sslproxies.org/";
+    const URL: &str = "https://www.sslproxies.org/";
     let client = reqwest::blocking::Client::new();
-    let res = client.get(url)
+    let res = client.get(URL)
         .header(USER_AGENT, getRandomUserAgent())
         .send().unwrap();  
     // Grab Table Element Out of HTML
-    let mut doc = Document::from_read(res).unwrap();
+    let doc = Document::from_read(res).unwrap();
 
     let mut ProxyList = Vec::new();
     
@@ -284,30 +307,3 @@ fn fetchProxyList() -> Vec<String> {
     }
     return ProxyList;
 }
-/*
-fn scrape(val: &str) -> Result<Vec<HashMap<String, String>>, String> {
-    let mut vec = Vec::new();
-    let mut book_reviews = HashMap::new();
-
-    // Review some books.
-    book_reviews.insert(
-        "ABCD".to_string(),
-        val.to_string(),
-    );
-    book_reviews.insert(
-        "Grimms' Fairy Tales".to_string(),
-        "Masterpiece.".to_string(),
-    );
-    book_reviews.insert(
-        "Pride and Prejudice".to_string(),
-        "Very enjoyable.".to_string(),
-    );
-    book_reviews.insert(
-        "The Adventures of Sherlock Holmes".to_string(),
-        "Eye lyked it alot.".to_string(),
-    );
-    vec.push(book_reviews.clone());
-    vec.push(book_reviews);
-
-    Ok(vec)
-}*/
