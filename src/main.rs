@@ -147,7 +147,6 @@ fn scrape(prof: &str, company_name: &str, proxy: Option<Vec<String>>) -> Vec<Vec
     loop {
         let searchURL = format!("http://www.bing.com/search?q=%22{}%22+%22{}%22+site%3Alinkedin.com",
                                         &prof, &company_name);
-        // Early Declaration
         let client;
         // Only go through a proxy if the list is provided
         if isProxy {
@@ -160,14 +159,14 @@ fn scrape(prof: &str, company_name: &str, proxy: Option<Vec<String>>) -> Vec<Vec
             client = reqwest::blocking::Client::builder().proxy(
                 reqwest::Proxy::all(&proxy).unwrap()
             ).timeout(
-                // 15 Second Timeout because this is supposed to work
+                // 20 Second Timeout because this is supposed to work
                 Duration::new(20, 0)
             ).build().unwrap();
         }
         else {
             client = reqwest::blocking::Client::builder().
             timeout(
-                // 15 Second Timeout because this is supposed to work
+                // 20 Second Timeout because this is supposed to work
                 Duration::new(20, 0)
             ).build().unwrap();
         }
