@@ -116,7 +116,16 @@ fn processBingData(doc: Document) -> Vec<Vec<String>> {
         // Remove trailing space
         let mut nameData = tokens[0].to_string();
         nameData.pop();
-
+        
+        // Bad result case 1
+        if tokens.len() < 2 {
+            continue;
+        }
+        // Bad result case 2
+        if tokens[1].len() < 2 {
+            continue;
+        }
+        
         // Remove trailing & leading space
         let job = &tokens[1][1..tokens[1].len()-1];
 
