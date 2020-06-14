@@ -2,7 +2,6 @@
 extern crate reqwest;
 extern crate select;
 extern crate rand;
-extern crate csv;
 
 use std::vec::Vec;
 use std::env;
